@@ -4,4 +4,6 @@
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
     <string name="button_start">Start</string>
+    <string name="consumer_token" />
+    <string name="consumer_token_secret" />
 </resources>
