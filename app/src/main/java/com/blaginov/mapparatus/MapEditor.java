@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -13,9 +14,11 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
 
+import com.blaginov.mapparatus.util.GetThatToken;
 import com.blaginov.mapparatus.util.OAuthHelper;
 
 import java.io.UnsupportedEncodingException;
+import java.util.concurrent.ExecutionException;
 
 import oauth.signpost.exception.OAuthCommunicationException;
 import oauth.signpost.exception.OAuthExpectationFailedException;
@@ -39,7 +42,7 @@ public class MapEditor extends ActionBarActivity {
         setContentView(R.layout.activity_map_editor);
 
         try {
-            oAuth = new OAuthHelper(urlBase, consKey, consSec, callback);
+            oAuth = new OAuthHelper(urlBaseD, consKeyD, consSecD, callback);
         } catch (UnsupportedEncodingException e) {
             Log.e("balls", "UnsupportedEncodingException, yo!");
             e.printStackTrace();
@@ -55,23 +58,19 @@ public class MapEditor extends ActionBarActivity {
         SharedPreferences sharedPref = getSharedPreferences("mapparatus",0);
         Log.i("consToken", sharedPref.getString("consToken",""));
         Log.i("consTokenSecret", sharedPref.getString("consToken",""));
-        oAuth.resume(urlBase, consKey, consSec, sharedPref.getString("consToken",""), sharedPref.getString("consTokenSecret",""), callback);
+        oAuth.resume(urlBaseD, consKeyD, consSecD, sharedPref.getString("consToken",""), sharedPref.getString("consTokenSecret",""), callback);
 
         if (token != null) {
             try {
-                String[] accessToken = oAuth.getAccessToken(token[1]);
-            } catch (OAuthMessageSignerException e) {
+                String[] accessToken = new GetThatToken().execute(oAuth, token[1]).get();
+                Log.i("ladies", accessToken[0]);
+                Log.i("and getlemen", accessToken[1]);
+            } catch (InterruptedException e) {
                 e.printStackTrace();
-            } catch (OAuthNotAuthorizedException e) {
-                e.printStackTrace();
-            } catch (OAuthExpectationFailedException e) {
-                e.printStackTrace();
-            } catch (OAuthCommunicationException e) {
+            } catch (ExecutionException e) {
                 e.printStackTrace();
             }
         }
-
-
     }
 
 
@@ -129,5 +128,4 @@ public class MapEditor extends ActionBarActivity {
         Log.i("verifier",verifier);
         return new String[] { token, verifier };
     }
-
 }
