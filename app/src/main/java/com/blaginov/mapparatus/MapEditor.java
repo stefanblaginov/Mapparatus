@@ -5,9 +5,10 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import com.blaginov.mapparatus.util.OAuthHelper;
+import com.blaginov.mapparatus.util.oauth.OAuthHelper;
 
 import java.io.UnsupportedEncodingException;
 
@@ -39,15 +40,19 @@ public class MapEditor extends ActionBarActivity {
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
-
     }
 
     @Override
     protected void onResume() {
         super.onResume();
 
-        // Resume OAuth processing
-        oAuth.completeOAuthProcess(this.getIntent().getData());
+        if (sharedPrefs.getBoolean("isLoggingIn1", false)) {
+            SharedPreferences.Editor sharedPrefsEditor = sharedPrefs.edit();
+            sharedPrefsEditor.putBoolean("isLoggingIn1", false);
+            sharedPrefsEditor.commit();
+            // Resume OAuth processing
+            oAuth.completeOAuthProcess(this.getIntent().getData());
+        }
     }
 
     @Override
@@ -77,10 +82,11 @@ public class MapEditor extends ActionBarActivity {
     }
 
     private void setOAuthPreferences(String consKey, String consSecret, String urlBase, String callbackUrl) {
-        sharedPrefs.edit().putString("consKey", consKey);
-        sharedPrefs.edit().putString("consSecret", consSecret);
-        sharedPrefs.edit().putString("urlBase", urlBase);
-        sharedPrefs.edit().putString("callbackUrl", callbackUrl);
-        sharedPrefs.edit().commit();
+        SharedPreferences.Editor sharedPrefsEditor = sharedPrefs.edit();
+        sharedPrefsEditor.putString("consKey", consKey);
+        sharedPrefsEditor.putString("consSecret", consSecret);
+        sharedPrefsEditor.putString("urlBase", urlBase);
+        sharedPrefsEditor.putString("callbackUrl", callbackUrl);
+        sharedPrefsEditor.commit();
     }
 }
