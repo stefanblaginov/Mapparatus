@@ -6,4 +6,5 @@
     <string name="button_start">Start</string>
     <string name="consumer_token" />
     <string name="consumer_token_secret" />
+    <string name="title_activity_map">Map</string>
 </resources>

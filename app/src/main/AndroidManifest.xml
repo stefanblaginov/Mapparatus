@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.blaginov.mapparatus" >
+
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -18,10 +19,20 @@
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+
                 <data android:scheme="mapparatus" />
             </intent-filter>
+        </activity>
+        <activity
+            android:name=".Map"
+            android:label="@string/title_activity_map"
+            android:parentActivityName=".MapEditor" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="MapEditor" />
         </activity>
     </application>
 

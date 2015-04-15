@@ -48,7 +48,7 @@ public class OAuthHelper {
      * @return null if fails
      */
     public String getRequestToken() {
-        class MyTask extends AsyncTask<Void, Void, String> {
+        class GetRequestTokenTask extends AsyncTask<Void, Void, String> {
             String result;
 
             @Override
@@ -83,7 +83,7 @@ public class OAuthHelper {
             }
         }
 
-        MyTask loader = new MyTask();
+        GetRequestTokenTask loader = new GetRequestTokenTask();
         loader.execute();
         try {
             return loader.get(10, TimeUnit.SECONDS);
@@ -127,8 +127,8 @@ public class OAuthHelper {
                 sharedPrefsEditor.putString("accessToken1", accessToken[1]);
                 sharedPrefsEditor.commit();
 
-                Log.i("accessToken0",sharedPrefs.getString("accessToken0", ""));
-                Log.i("accessToken1",sharedPrefs.getString("accessToken1", ""));
+                Log.i("accessToken0", sharedPrefs.getString("accessToken0", ""));
+                Log.i("accessToken1", sharedPrefs.getString("accessToken1", ""));
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }

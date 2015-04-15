@@ -1,9 +1,19 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools" tools:context=".MapEditor">
-    <item android:id="@+id/action_settings"
+    <item android:id="@+id/action_login"
         android:title="Login to OSM"
         android:orderInCategory="100"
         app:showAsAction="never"
         android:onClick="osmLogin" />
+    <item android:id="@+id/action_download"
+        android:title="Download OSM data"
+        android:orderInCategory="100"
+        app:showAsAction="never"
+        android:onClick="osmDownload" />
+    <item android:id="@+id/action_map"
+        android:title="Map"
+        android:orderInCategory="100"
+        app:showAsAction="never"
+        android:onClick="openMap" />
 </menu>
