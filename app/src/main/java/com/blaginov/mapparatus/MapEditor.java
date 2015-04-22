@@ -42,7 +42,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.zip.GZIPInputStream;
 
-
 public class MapEditor extends ActionBarActivity implements View.OnTouchListener {
     private enum MapparatusState { CHOOSING_EDIT_SPOT, MAPPING, CAN_MODIFY_MAP, MODIFYING_MAP }
 
