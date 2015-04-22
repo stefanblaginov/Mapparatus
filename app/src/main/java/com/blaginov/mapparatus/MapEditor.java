@@ -179,7 +179,6 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         }
     }
 
-
     @Override
     protected void onPause() {
         super.onPause();

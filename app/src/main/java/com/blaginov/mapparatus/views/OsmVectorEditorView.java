@@ -71,7 +71,7 @@ public class OsmVectorEditorView extends View {
     }
 
     public OsmVectorEditorView(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
+        super(context, attgit rs, defStyleAttr);
     }
 
     @Override

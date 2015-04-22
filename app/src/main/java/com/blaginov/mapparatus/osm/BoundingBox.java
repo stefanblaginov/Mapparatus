@@ -6,18 +6,15 @@ import java.util.ArrayList;
 
 import org.xmlpull.v1.XmlSerializer;
 
-import android.app.Application;
 import android.util.Log;
 
-import com.blaginov.mapparatus.Map;
-import com.blaginov.mapparatus.MapEditor;
 import com.blaginov.mapparatus.exception.OsmException;
 import com.blaginov.mapparatus.util.GeoMath;
 
 /**
  * BoundingBox represents a bounding box for a selection of an area. All values
  * are in decimal-degree (WGS84), multiplied by 1E7.
- * 
+ *
  * @author mb
  */
 public class BoundingBox implements Serializable, JosmXmlSerializable {
@@ -54,11 +51,17 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 	 */
 	private int height;
 
+
+    private int canvasHeight;
+
+    private int canvasWidth;
+
+
 	/**
 	 * Factor for stretching the latitude to fit the Mercator Projection.
 	 */
 	private double mercatorFactorPow3;
-	
+
 
 	/**
 	 * Mercator value for the bottom of the BBos
@@ -123,7 +126,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 	/**
 	 * Generates a bounding box with the given borders. Of course, left must be
 	 * left to right and top must be top of bottom.
-	 * 
+	 *
 	 * @param left degree of the left Border, multiplied by 1E7
 	 * @param bottom degree of the bottom Border, multiplied by 1E7
 	 * @param right degree of the right Border, multiplied by 1E7
@@ -141,9 +144,32 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 		validate();
 	}
 
+    /**
+     * Generates a bounding box with the given borders. Of course, left must be
+     * left to right and top must be top of bottom.
+     *
+     * @param left degree of the left Border, multiplied by 1E7
+     * @param bottom degree of the bottom Border, multiplied by 1E7
+     * @param right degree of the right Border, multiplied by 1E7
+     * @param top degree of the top Border, multiplied by 1E7
+     * @throws OsmException when the borders are mixed up or outside of
+     * {@link #MAX_LAT_E7}/{@link #MAX_LON} (!{@link #isValid()})
+     */
+    public BoundingBox(final int left, final int bottom, final int right, final int top, final int canvasHeight, final int canvasWidth) throws OsmException {
+        this.left = left;
+        this.bottom = bottom;
+        this.right = right;
+        this.top = top;
+        this.canvasHeight = canvasHeight;
+        this.canvasWidth = canvasWidth;
+        calcDimensions();
+        calcMercatorFactorPow3();
+        validate();
+    }
+
 	/**
 	 * Generates a bounding box with the given borders.
-	 * 
+	 *
 	 * @param left degree of the left Border
 	 * @param bottom degree of the bottom Border
 	 * @param right degree of the right Border
@@ -157,7 +183,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 
 	/**
 	 * Generates a bounding box with a given radius and a center-position.
-	 * 
+	 *
 	 * @param centerLat latitude of the center
 	 * @param centerLon longitude of the center
 	 * @param radius radius in degree
@@ -169,7 +195,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 
 	/**
 	 * Copy-Constructor.
-	 * 
+	 *
 	 * @param box box with the new borders.
 	 * @throws OsmException see {@link #BoundingBox(int, int, int, int)}
 	 */
@@ -199,7 +225,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 
 	/**
 	 * Checks if the bounding box is valid for the OSM API.
-	 * 
+	 *
 	 * @return true, if the bbox is smaller than 0.5*0.5 (here multiplied by
 	 * 1E7) degree.
 	 */
@@ -286,7 +312,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 
 	/**
 	 * Checks if lat/lon is in this bounding box.
-	 * 
+	 *
 	 * @param latE7
 	 * @param lonE7
 	 * @return true if lat/lon is inside this bounding box.
@@ -298,7 +324,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 	/**
 	 * Checks if a line between lat/lon and lat2/lon2 may intersect with this
 	 * bounding box.
-	 * 
+	 *
 	 * @param lat
 	 * @param lon
 	 * @param lat2
@@ -315,7 +341,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 		}
 		return true;
 	}
-	
+
 	public boolean intersects(final BoundingBox b) {
 		// this is naturally only true on the plain, probably should use mercator coordinates
 		//Log.d("BoundingBox","intersects " + left + "/" + bottom  + "/"  + right + "/" + top + "  " + b.left + "/" + b.bottom  + "/"  + b.right + "/" + b.top);
@@ -327,7 +353,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 	 * Checks if an intersection with a line between lat/lon and lat2/lon2 is
 	 * impossible. If two coordinates (lat/lat2 or lon/lon2) are outside of a
 	 * border, no intersection is possible.
-	 * 
+	 *
 	 * @param lat
 	 * @param lon
 	 * @param lat2
@@ -383,7 +409,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 	public void setRatio(final float ratio) throws OsmException {
 		setRatio(ratio, false);
 	}
-	
+
 	/**
 	 * Changes the dimensions of this bounding box to fit the given ratio.
 	 * @param ratio The new aspect ratio.
@@ -396,8 +422,8 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 		long mTop = GeoMath.latE7ToMercatorE7(top); // note long or else we get an int overflow on calculating the center
 		long mBottom = GeoMath.latE7ToMercatorE7(bottom);
 		long mHeight = mTop - mBottom;
-		
-		
+
+
 		if (width <= 0 || mHeight <=0) {
 			// should't happen, but just in case
 			Log.d("BoundingBox","Width or height zero: " + width + "/" + height);
@@ -411,7 +437,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 			mBottom = GeoMath.latE7ToMercatorE7(bottom);
 			mHeight = mTop - mBottom;
 		}
-		
+
 		//Log.d("BoundingBox","current ratio " + this.ratio + " new ratio " + ratio);
 		if ((ratio > 0) && !Float.isNaN(ratio)) {
 			if (preserveZoom) {
@@ -420,29 +446,29 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 				// zoom out
 				long centerX = left + width / 2L; // divide first to stay < 2^32
 				long centerY = mBottom + mHeight / 2L;
-				
+
 				long newHeight2 = 0;
 				long newWidth2 = 0;
 				if (ratio < 1.0) { // portrait
-					if (width < mHeight) { 
+					if (width < mHeight) {
 						newHeight2 = (long)((width / 2L) / ratio);
 						newWidth2 = (long)(width / 2L);
 					} else { // switch landscape --> portrait
-						float pixelDeg = (float) Map.getHeight()/(float)width; // height was the old width
-						newWidth2 = (long)(Map.getWidth() / pixelDeg)/2L;
+						float pixelDeg = (float) canvasHeight/(float)width; // height was the old width
+						newWidth2 = (long)(canvasWidth / pixelDeg)/2L;
 						newHeight2 = (long)(newWidth2 / ratio );
 					}
 				} else { // landscape
 					if (width < mHeight) { // switch portrait -> landscape
-						float pixelDeg = (float)Map.getHeight()/(float)width; // height was the old width
-						newWidth2 = (long)(Map.getWidth() / pixelDeg)/2L;
+						float pixelDeg = (float) canvasHeight/(float)width; // height was the old width
+						newWidth2 = (long)(canvasWidth / pixelDeg)/2L;
 						newHeight2 = (long)(newWidth2 / ratio );
 					} else {
 						newHeight2 =(long)((width / 2L) / ratio);
 						newWidth2 = (long)(width / 2L);
 					}
 				}
-				
+
 				if (centerX + newWidth2 > MAX_LON) {
 					right = MAX_LON;
 					left = (int) Math.max(-MAX_LON, MAX_LON - 2*newWidth2);
@@ -453,9 +479,9 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 					left = (int) (centerX - newWidth2);
 					right = (int) (centerX + newWidth2);
 				}
-				
-				// 
-				if ((centerY + newHeight2) > GeoMath.MAX_MLAT_E7) { 
+
+				//
+				if ((centerY + newHeight2) > GeoMath.MAX_MLAT_E7) {
 					mTop = GeoMath.MAX_MLAT_E7;
 					mBottom = Math.max(-GeoMath.MAX_MLAT_E7, GeoMath.MAX_MLAT_E7 - 2*newHeight2);
 				} else if ((centerY - newHeight2) < -GeoMath.MAX_MLAT_E7) {
@@ -503,7 +529,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 	/**
 	 * Performs a translation so the center of this bounding box will be at
 	 * (lonCenter|latCenter).
-	 * 
+	 *
 	 * @param lonCenter the absolute longitude for the center (deg*1E7)
 	 * @param latCenter the absolute latitude for the center (deg*1E7)
 	 */
@@ -512,21 +538,21 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 		double mLatCenter = GeoMath.latE7ToMercator(latCenter);
 		double mTop = GeoMath.latE7ToMercator(top);
 		int newBottom = GeoMath.mercatorToLatE7(mLatCenter - (mTop - bottomMercator)/2);
-		
+
 		try {
 			translate((lonCenter - left - (int)(width / 2L)), newBottom - bottom);
 		} catch (OsmException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}		
+		}
 	}
-	
+
 
 	/**
 	 * Relative translation.
-	 * 
+	 *
 	 * Note clamping based on direction of movement can cause problems, always check that we are in bounds
-	 * 
+	 *
 	 * @param lon the relative longitude change.
 	 * @param lat the relative latitude change.
 	 */
@@ -535,7 +561,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 			lon = MAX_LON - right;
 		} else if ((long)left + (long)lon < (long)-MAX_LON) {
 			lon = -MAX_LON - left;
-		} 
+		}
 		if (top + lat > MAX_LAT_E7) {
 			lat = MAX_LAT_E7 - top;
 		} else if (bottom + lat < -MAX_LAT_E7) {
@@ -548,7 +574,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 		setRatio(ratio, true); //TODO slightly expensive likely to be better to do everything in mercator
 		validate();
 	}
-	
+
 	/** Calculate the largest zoom-in factor that can be applied to the current
 	 * view.
 	 * @return The largest allowable zoom-in factor.
@@ -556,7 +582,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 	private float zoomInLimit() {
 		return  (width - MIN_ZOOM_WIDTH) / 2f / width;
 	}
-	
+
 	/**
 	 * Calculate the largest zoom-out factor that can be applied to the current
 	 * view.
@@ -565,10 +591,10 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 	private float zoomOutLimit() {
 		long mTop = GeoMath.latE7ToMercatorE7(top);
 		long mBottom = GeoMath.latE7ToMercatorE7(bottom);
-		long mHeight = mTop - mBottom; 
+		long mHeight = mTop - mBottom;
 		return -Math.min((MAX_ZOOM_WIDTH - width) / 2f / width, ((2l*(long)GeoMath.MAX_MLAT_E7) - mHeight) / 2f /mHeight);
 	}
-	
+
 	/**
 	 * Test if the box can be zoomed in.
 	 * @return true if the box can be zoomed in, false if it can't.
@@ -576,7 +602,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 	public boolean canZoomIn() {
 		return (ZOOM_IN < zoomInLimit());
 	}
-	
+
 	/**
 	 * Test if the box can be zoomed out.
 	 * @return true if the box can be zoomed out, false if it can't.
@@ -585,7 +611,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 		// return (ZOOM_OUT > zoomOutLimit());
 		return zoomOutLimit() < -3.1E-9; // determined experimental
 	}
-	
+
 	/**
 	 * Reduces this bounding box by the ZOOM_IN factor. The ratio of width and
 	 * height remains.
@@ -598,7 +624,7 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**
 	 * Enlarges this bounding box by the ZOOM_OUT factor. The ratio of width
 	 * and height remains.
@@ -614,23 +640,23 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 
 	/**
 	 * Enlarges/reduces the borders by zoomFactor.
-	 * 
+	 *
 	 * @param zoomFactor factor enlarge/reduce the borders.
 	 */
 	public void zoom(float zoomFactor) throws OsmException {
 		// Log.d("BoundingBox","zoom " + this.toString());
 		zoomFactor = Math.min(zoomInLimit(), zoomFactor);
 		zoomFactor = Math.max(zoomOutLimit(), zoomFactor);
-	
+
 		long mTop = GeoMath.latE7ToMercatorE7(top);
 		long mBottom = GeoMath.latE7ToMercatorE7(bottom);
 		long mHeight = mTop - mBottom;
-		
+
 		long horizontalChange = (long)(width * zoomFactor);
 		long verticalChange = (long)(mHeight * zoomFactor);
-		long tmpLeft=left; 
+		long tmpLeft=left;
 		long tmpRight=right;
-		// 
+		//
 		if (tmpLeft + horizontalChange < (long)-MAX_LON) {
 			long rest = left + horizontalChange + (long)MAX_LON;
 			tmpLeft = -MAX_LON;
@@ -649,18 +675,18 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 		right = (int)tmpRight;
 		// left = Math.max(-MAX_LON, left + (int)horizontalChange);
 		// right = Math.min(MAX_LON, right - (int)horizontalChange);
-		
+
 		if ((mBottom + verticalChange) < -GeoMath.MAX_MLAT_E7) {
 			long rest = mBottom + (long)verticalChange + (long)GeoMath.MAX_MLAT_E7;
 			mBottom = - GeoMath.MAX_MLAT_E7;
-			mTop = mTop - rest;	
+			mTop = mTop - rest;
 		} else {
 			mBottom = mBottom + verticalChange;
 		}
 		if ((mTop - verticalChange) > (long)GeoMath.MAX_MLAT_E7) {
 			long rest = mTop - verticalChange - (long)GeoMath.MAX_MLAT_E7;
 			mTop = GeoMath.MAX_MLAT_E7;
-			mBottom = Math.max(-GeoMath.MAX_MLAT_E7,mBottom - rest);	
+			mBottom = Math.max(-GeoMath.MAX_MLAT_E7,mBottom - rest);
 		} else {
 			mTop = mTop - verticalChange;
 		}
@@ -670,11 +696,11 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 		// top = Math.min(MAX_LAT_E7, GeoMath.mercatorE7ToLatE7((int)(mTop - (long)verticalChange)));
 
 		// setRatio(ratio, true);
-		
+
 		calcDimensions(); // need to do this or else centering will not work
 		calcMercatorFactorPow3();
 	}
-	
+
 	/**
 	 * set current zoom level to a tile zoom level equivalent, powers of 2 assuming 256x256 tiles
 	 * maintain center of bounding box
@@ -684,8 +710,8 @@ public class BoundingBox implements Serializable, JosmXmlSerializable {
 		// setting an exact zoom level implies one screen pixel == one tile pixel
 		// calculate one pixel in degrees (mercator) at this zoom level
 		double degE7PerPixel = 3600000000.0d / (256*Math.pow(2, tileZoomLevel));
-		double wDegE7 = Map.getWidth() * degE7PerPixel;
-		double hDegE7 = Map.getHeight() * degE7PerPixel;
+		double wDegE7 = canvasHeight * degE7PerPixel;
+		double hDegE7 = canvasWidth * degE7PerPixel;
 		long centerLon = left + width/2;
 		left = (int) (centerLon - wDegE7/2);
 		right = (int) (left + wDegE7);
