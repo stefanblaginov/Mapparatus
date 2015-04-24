@@ -62,7 +62,7 @@ public class BingMapTileSource extends QuadTreeTileSource implements IStyledTile
 	 * @see
 	 * <a href="http://msdn.microsoft.com/en-us/library/ff428642.aspx">http://msdn.microsoft.com/en-us/library/ff428642.aspx</a>
 	 */
-	private static String mBingMapKey = "";
+	private static String mBingMapKey = "AiLzMHQ7NcmBgW78WhDZtcOYC2fjRKq-4_t4Y2RMZCgcw1yklyuETBjgZhIWR3Uj";
 
 	private String mStyle = IMAGERYSET_ROAD;
 

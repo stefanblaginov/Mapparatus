@@ -1,110 +1,124 @@
 package com.blaginov.mapparatus.views;
 
 import android.content.Context;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Shader;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.MenuItem;
 import android.view.View;
 
-import com.blaginov.mapparatus.exception.OsmException;
+import com.blaginov.mapparatus.R;
 import com.blaginov.mapparatus.osm.BoundingBox;
+import com.blaginov.mapparatus.osm.Node;
+import com.blaginov.mapparatus.osm.Storage;
+import com.blaginov.mapparatus.osm.Way;
 import com.blaginov.mapparatus.util.GeoMath;
 
-import org.osmdroid.util.BoundingBoxE6;
 import org.osmdroid.views.MapView;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by stefanblag on 20.04.15.
  */
 public class OsmVectorEditorView extends View {
 
-    MapView mapView;
-    BoundingBox viewBox;
+    private MapView mapView;
+    private BoundingBox viewBox;
+    private Storage storage;
+    private List<Node> nodes;
 
-    private int panX = 0;
-    private int panY = 0;
+    private int panX;
+    private int panY;
 
     private float zoomFactor = 1;
-    private int zoomCenterX = 0;
-    private int zoomCenterY = 0;
+    private int zoomCenterX;
+    private int zoomCenterY;
 
-    private int editX = 0;
-    private int editY = 0;
+    private boolean dragging = false;
+    private boolean tapping = false;
+    private float drawX;
+    private float drawY;
+    private final double TOUCH_RADIUS_SQRD = Math.pow(40, 2);
 
-    int minlon = (int)(-1.482194*1E7);
-    int minlat = (int)(53.379330*1E7);
-    int maxlon = (int)(-1.478331*1E7);
-    int maxlat = (int)(53.382907*1E7);
+    private Bitmap magnicursor;
 
-    int minlon2 = (int)(-1.484279*1E7);
-    int minlat2 = (int)(53.378203*1E7);
-    int maxlon2 = (int)(-1.474979*1E7);
-    int maxlat2 = (int)(53.384103*1E7);
+    public OsmVectorEditorView(Context context) { super(context); }
 
+    public OsmVectorEditorView(Context context, AttributeSet attrs) { super(context, attrs); }
 
+    public OsmVectorEditorView(Context context, AttributeSet attrs, int defStyleAttr) { super(context, attrs, defStyleAttr); }
 
-    double minlon6 = -1.482194*1E6;
-    double minlat6 = 53.379330*1E6;
-    double maxlon6 = -1.478331*1E6;
-    double maxlat6 = 53.382907*1E6;
-
-    int point1Lat = (int)(53.381238*1E7);
-    int point1Lon = (int)(-1.480735*1E7);
-
-    int point2Lat = (int)(53.381259*1E7);
-    int point2Lon = (int)(-1.479987*1E7);
-
-    int point3Lat = (int)(53.380850*1E7);
-    int point3Lon = (int)(-1.479960*1E7);
-
-    int point4Lat = (int)(53.380824*1E7);
-    int point4Lon = (int)(-1.480653*1E7);
-
-    public OsmVectorEditorView(Context context) {
-        super(context);
-    }
-
-    public OsmVectorEditorView(Context context, AttributeSet attrs) {
-        super(context, attrs);
-    }
-
-    public OsmVectorEditorView(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
+    @Override
+    protected void onFinishInflate() {
+        super.onFinishInflate();
+        Resources resources = getResources();
+        magnicursor = BitmapFactory.decodeResource(resources, R.drawable.magnicursor);
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+
         if (viewBox != null) {
             zoomCenterX = canvas.getWidth() / 2;
             zoomCenterY = canvas.getHeight() / 2;
 
-
-            if (mapView != null) {
-                //mapView.zoomToBoundingBox(new BoundingBoxE6(maxlat6, maxlon6, minlat6, minlon6));
-                //mapView.scrollTo((int) panX, (int) panY);
-                //mapViewController.setCenter(new MyPoint());
-            }
-
             Paint nodePaint = new Paint();
             nodePaint.setARGB(255, 50, 50, 255);
 
-            canvas.drawCircle(zoom((int) (GeoMath.lonE7ToX(getWidth(), viewBox, GeoMath.xToLonE7(getWidth(), viewBox, editX)) - panX), zoomFactor, zoomCenterX), zoom((int) (GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, GeoMath.yToLatE7(getHeight(), getWidth(), viewBox, editY)) - panY), zoomFactor, zoomCenterY), 60, nodePaint);
+            Paint highlightedNodePaint = new Paint();
+            highlightedNodePaint.setARGB(255, 100, 100, 255);
 
-            canvas.drawCircle(zoom((int) (GeoMath.lonE7ToX(getWidth(), viewBox, point1Lon) - panX), zoomFactor, zoomCenterX), zoom((int) (GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, point1Lat) - panY), zoomFactor, zoomCenterY), 10, nodePaint);
-            canvas.drawCircle(zoom((int) (GeoMath.lonE7ToX(getWidth(), viewBox, point2Lon) - panX), zoomFactor, zoomCenterX), zoom((int) (GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, point2Lat) - panY), zoomFactor, zoomCenterY), 20, nodePaint);
-            canvas.drawCircle(zoom((int) (GeoMath.lonE7ToX(getWidth(), viewBox, point3Lon) - panX), zoomFactor, zoomCenterX), zoom((int) (GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, point3Lat) - panY), zoomFactor, zoomCenterY), 30, nodePaint);
-            canvas.drawCircle(zoom((int) (GeoMath.lonE7ToX(getWidth(), viewBox, point4Lon) - panX), zoomFactor, zoomCenterX), zoom((int) (GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, point4Lat) - panY), zoomFactor, zoomCenterY), 40, nodePaint);
+            if (storage != null && !storage.isEmpty()) {
+                for (Way way : storage.getWays()) {
+                    List<Node> currentWayNodes = way.getNodes();
+                    for (int i = 1; i < currentWayNodes.size(); i++) {
+                        canvas.drawLine(
+                                zoom((GeoMath.lonE7ToX(getWidth(), viewBox, currentWayNodes.get(i - 1).getLon()) - panX), zoomFactor, zoomCenterX),
+                                zoom((GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, currentWayNodes.get(i - 1).getLat()) - panY), zoomFactor, zoomCenterY),
+                                zoom((GeoMath.lonE7ToX(getWidth(), viewBox, currentWayNodes.get(i).getLon()) - panX), zoomFactor, zoomCenterX),
+                                zoom((GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, currentWayNodes.get(i).getLat()) - panY), zoomFactor, zoomCenterY),
+                                nodePaint);
+                    }
+                }
 
+                for (Node node : storage.getNodes()) {
+                    float currentNodeX = zoom((GeoMath.lonE7ToX(getWidth(), viewBox, node.getLon()) - panX), zoomFactor, zoomCenterX);
+                    float currentNodeY = zoom((GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, node.getLat()) - panY), zoomFactor, zoomCenterY);
 
+                    if (tapping && Math.pow(drawX - currentNodeX, 2) + Math.pow(drawY - 260 - currentNodeY, 2) < TOUCH_RADIUS_SQRD) {
+                        canvas.drawCircle(currentNodeX, currentNodeY, 50, highlightedNodePaint);
+                    } else if (dragging && Math.pow(drawX - currentNodeX, 2) + Math.pow(drawY - 260 - currentNodeY, 2) < TOUCH_RADIUS_SQRD) {
+                        canvas.drawCircle(currentNodeX, currentNodeY, 30, nodePaint);
+                    } else {
+                        canvas.drawCircle(currentNodeX, currentNodeY, 10, nodePaint);
+                    }
+                }
+
+            }
+
+            if (dragging || tapping) {
+                canvas.drawBitmap(magnicursor, drawX - magnicursor.getWidth() / 2 - 2, drawY - 380, nodePaint);
+            }
         }
         invalidate();
     }
 
     public void setViewBox(BoundingBox viewBox) {
         this.viewBox = viewBox;
+    }
+
+    public void setStorage(Storage storage) {
+        this.storage = storage;
+        nodes = storage.getNodes();
+
     }
 
     public void setPanCoords(int panX, int panY) {
@@ -116,12 +130,20 @@ public class OsmVectorEditorView extends View {
         this.zoomFactor = zoomFactor;
     }
 
-    public void setEditPointCoords(int editX, int editY) {
-        this.editX = editX;
-        this.editY = editY;
+    public void setDragStatus(boolean dragging) {
+        this.dragging = dragging;
     }
 
-    private float zoom(int point, float factor, int pointOfZoom) {
-        return (int) ((point - pointOfZoom) * factor) + pointOfZoom;
+    public void setTapStatus(boolean tapping) {
+        this.tapping = tapping;
+    }
+
+    public void setDrawingCoords(float drawX, float drawY) {
+        this.drawX = drawX;
+        this.drawY = drawY;
+    }
+
+    private float zoom(float point, float factor, int pointOfZoom) {
+        return ((point - pointOfZoom) * factor) + pointOfZoom;
     }
 }

@@ -1,5 +1,11 @@
 package com.blaginov.mapparatus.osm;
 
+import android.app.Application;
+import android.util.Log;
+import android.widget.Toast;
+
+import com.blaginov.mapparatus.exception.OsmServerException;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -12,64 +18,59 @@ import java.util.zip.GZIPInputStream;
  */
 public class Server {
     private static final int TIMEOUT = 45 * 1000;
+    private final String USER_AGENT = "Mapparatus";
+    private final String SERVER_URL = "http://api.openstreetmap.org/api/0.6/";
 
-    public InputStream getStreamFromBox() throws IOException {
-        URL url = null;
-        try {
-            url = new URL("http://api.openstreetmap.org/api/0.6/map?bbox=11.54,48.14,11.543,48.145");
-        } catch (MalformedURLException e) {
-            e.printStackTrace();
-        }
-        HttpURLConnection con = null;
-        try {
-            con = (HttpURLConnection) url.openConnection();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    /**
+     * @param \area
+     * @return
+     * @throws IOException
+     * @throws \OsmServerException
+     */
+    public InputStream getStreamForBox(final BoundingBox box) throws OsmServerException, IOException {
+        Log.d("Server", "getStreamForBox");
+        URL url = new URL(SERVER_URL  + "map?bbox=" + box.toApiString());
+        HttpURLConnection con = (HttpURLConnection) url.openConnection();
         boolean isServerGzipEnabled = false;
+
+        Log.d("Server", "getStreamForBox " + url.toString());
 
         //--Start: header not yet send
         con.setReadTimeout(TIMEOUT);
         con.setConnectTimeout(TIMEOUT);
         con.setRequestProperty("Accept-Encoding", "gzip");
-        con.setRequestProperty("User-Agent", "Mapparatus/Unborn");
+        con.setRequestProperty("User-Agent", USER_AGENT);
 
         //--Start: got response header
         isServerGzipEnabled = "gzip".equals(con.getHeaderField("Content-encoding"));
 
-		/*
-		// retry if we have no resopnse-code
-		try {SAXParserFactory factory = SAXParserFactory.newInstance();
-		SAXParser saxParser = factory.newSAXParser();
-		saxParser.parse(in, this);
-			if (con.getResponseCode() == -1) {
-				System.out.println( ":getStreamForBox" + "no valid http response-code, trying again");
-				con = (HttpURLConnection) url.openConnection();
-				//--Start: header not yet send
-				con.setReadTimeout(TIMEOUT);
-				con.setConnectTimeout(TIMEOUT);
-				con.setRequestProperty("Accept-Encoding", "gzip");
-				con.setRequestProperty("User-Agent", "Mapparatus/Unborn");
+        // retry if we have no response-code
+        if (con.getResponseCode() == -1) {
+            Log.w(getClass().getName()+ ":getStreamForBox", "no valid http response-code, trying again");
+            con = (HttpURLConnection) url.openConnection();
+            //--Start: header not yet send
+            con.setReadTimeout(TIMEOUT);
+            con.setConnectTimeout(TIMEOUT);
+            con.setRequestProperty("Accept-Encoding", "gzip");
+            con.setRequestProperty("User-Agent", USER_AGENT);
 
-				//--Start: got response header
-				isServerGzipEnabled = "gzip".equals(con.getHeaderField("Content-encoding"));
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		}*/
+            //--Start: got response header
+            isServerGzipEnabled = "gzip".equals(con.getHeaderField("Content-encoding"));
+        }
 
-        try {
-            if (con.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                System.out.println(con.getResponseCode() + "The API server does not except the request: " + con
-                        + ", response code: " + con.getResponseCode() + " \"" + con.getResponseMessage() + "\"");
+        if (con.getResponseCode() != HttpURLConnection.HTTP_OK) {
+            if (con.getResponseCode() == 400) {
+                Log.e("OSM Server", "400");
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+            else {
+                Log.e("OSM Server", con.getResponseMessage());
+            }
+            throw new OsmServerException(con.getResponseCode(), "The API server does not except the request: " + con
+                    + ", response code: " + con.getResponseCode() + " \"" + con.getResponseMessage() + "\"");
         }
 
         if (isServerGzipEnabled) {
             return new GZIPInputStream(con.getInputStream());
-
         } else {
             return con.getInputStream();
         }
