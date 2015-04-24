@@ -4,12 +4,9 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.Shader;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
 
 import com.blaginov.mapparatus.R;
@@ -21,7 +18,6 @@ import com.blaginov.mapparatus.util.GeoMath;
 
 import org.osmdroid.views.MapView;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -43,11 +39,17 @@ public class OsmVectorEditorView extends View {
 
     private boolean dragging = false;
     private boolean tapping = false;
+    private boolean movingNode = false;
     private float drawX;
     private float drawY;
-    private final double TOUCH_RADIUS_SQRD = Math.pow(40, 2);
+    private final double SELECTING_TOUCH_RADIUS_SQRD = Math.pow(15, 2);
+
+    private long currentMovingNodeId;
 
     private Bitmap magnicursor;
+    private float magnicursorOffsetX;
+    private final float MAGNICURSOR_OFFSET_Y = -380;
+    private final float DRAW_OFFSET_Y = -260;
 
     public OsmVectorEditorView(Context context) { super(context); }
 
@@ -60,6 +62,7 @@ public class OsmVectorEditorView extends View {
         super.onFinishInflate();
         Resources resources = getResources();
         magnicursor = BitmapFactory.decodeResource(resources, R.drawable.magnicursor);
+        magnicursorOffsetX = -(magnicursor.getWidth() / 2) - 2;
     }
 
     @Override
@@ -89,23 +92,37 @@ public class OsmVectorEditorView extends View {
                     }
                 }
 
+                if (!tapping) {
+                    movingNode = false;
+                    currentMovingNodeId = -1;
+                }
+
                 for (Node node : storage.getNodes()) {
                     float currentNodeX = zoom((GeoMath.lonE7ToX(getWidth(), viewBox, node.getLon()) - panX), zoomFactor, zoomCenterX);
                     float currentNodeY = zoom((GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, node.getLat()) - panY), zoomFactor, zoomCenterY);
 
-                    if (tapping && Math.pow(drawX - currentNodeX, 2) + Math.pow(drawY - 260 - currentNodeY, 2) < TOUCH_RADIUS_SQRD) {
-                        canvas.drawCircle(currentNodeX, currentNodeY, 50, highlightedNodePaint);
-                    } else if (dragging && Math.pow(drawX - currentNodeX, 2) + Math.pow(drawY - 260 - currentNodeY, 2) < TOUCH_RADIUS_SQRD) {
+                    canvas.drawCircle(currentNodeX, currentNodeY, 10, nodePaint);
+
+                    if (tapping) {
+                        if (movingNode) {
+                            storage.getNode(currentMovingNodeId).setLon(GeoMath.xToLonE7(getWidth(), viewBox, unzoom(drawX, zoomFactor, zoomCenterX) + panX));
+                            storage.getNode(currentMovingNodeId).setLat(GeoMath.yToLatE7(getHeight(), getWidth(), viewBox, unzoom(drawY + DRAW_OFFSET_Y, zoomFactor, zoomCenterY) + panY));
+                            canvas.drawCircle(drawX, drawY + DRAW_OFFSET_Y, 30, highlightedNodePaint);
+                        } else if (Math.pow(drawX - currentNodeX, 2) + Math.pow(drawY + DRAW_OFFSET_Y - currentNodeY, 2) < SELECTING_TOUCH_RADIUS_SQRD) {
+                            movingNode = true;
+                            currentMovingNodeId = node.getOsmId();
+                            node.updateState(Node.STATE_MODIFIED);
+                            canvas.drawCircle(drawX, drawY + DRAW_OFFSET_Y, 30, highlightedNodePaint);
+                        }
+                    } else if (dragging && Math.pow(drawX - currentNodeX, 2) + Math.pow(drawY + DRAW_OFFSET_Y - currentNodeY, 2) < SELECTING_TOUCH_RADIUS_SQRD) {
                         canvas.drawCircle(currentNodeX, currentNodeY, 30, nodePaint);
-                    } else {
-                        canvas.drawCircle(currentNodeX, currentNodeY, 10, nodePaint);
                     }
                 }
 
             }
 
             if (dragging || tapping) {
-                canvas.drawBitmap(magnicursor, drawX - magnicursor.getWidth() / 2 - 2, drawY - 380, nodePaint);
+                canvas.drawBitmap(magnicursor, drawX + magnicursorOffsetX, drawY + MAGNICURSOR_OFFSET_Y, nodePaint);
             }
         }
         invalidate();
@@ -145,5 +162,9 @@ public class OsmVectorEditorView extends View {
 
     private float zoom(float point, float factor, int pointOfZoom) {
         return ((point - pointOfZoom) * factor) + pointOfZoom;
+    }
+
+    private float unzoom(float point, float factor, int pointOfZoom) {
+        return ((point - pointOfZoom) / factor) + pointOfZoom;
     }
 }

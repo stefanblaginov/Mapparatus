@@ -56,15 +56,20 @@ public class Node extends OsmElement implements GeoPoint {
 		return lon;
 	}
 
-	void setLat(final int lat) {
+	public void setLat(final int lat) {
 		this.lat = lat;
 	}
 
-	void setLon(final int lon) {
+    public void setLon(final int lon) {
 		this.lon = lon;
 	}
 
-	/**
+    @Override
+    public void updateState(byte newState) {
+        super.updateState(newState);
+    }
+
+    /**
 	 * {@inheritDoc}
 	 */
 	@Override
