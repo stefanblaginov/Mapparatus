@@ -19,6 +19,7 @@ import android.widget.Toast;
 
 import com.blaginov.mapparatus.exception.OsmException;
 import com.blaginov.mapparatus.osm.BoundingBox;
+import com.blaginov.mapparatus.osm.OsmParser;
 import com.blaginov.mapparatus.osm.Server;
 import com.blaginov.mapparatus.util.oauth.OAuthHelper;
 import com.blaginov.mapparatus.views.OsmVectorEditorView;
@@ -27,20 +28,16 @@ import org.osmdroid.tileprovider.tilesource.bing.BingMapTileSource;
 import org.osmdroid.util.BoundingBoxE6;
 import org.osmdroid.views.MapController;
 import org.osmdroid.views.MapView;
+import org.xml.sax.SAXException;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.Locale;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.zip.GZIPInputStream;
+
+import javax.xml.parsers.ParserConfigurationException;
 
 public class MapEditor extends ActionBarActivity implements View.OnTouchListener {
     private enum MapparatusState { CHOOSING_EDIT_SPOT, MAPPING, CAN_MODIFY_MAP, MODIFYING_MAP }
@@ -66,12 +63,8 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
     // Pan-related variables
     private float uponTouchX;
     private float uponTouchY;
-    private int editingCursorPanX;
-    private int editingCursorPanY;
     private int editorViewPanX;
     private int editorViewPanY;
-    private int currentPanX;
-    private int currentPanY;
     private int oldPanX;
     private int oldPanY;
 
@@ -86,15 +79,10 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
 
     // Touch manipulation-related variables
     private boolean isFirstEditTapTapped = false;
-    private int dragX;
-    private int dragY;
-    private int tapX;
-    private int tapY;
 
     // OAuth-related variables
     private SharedPreferences sharedPrefs;
     private OAuthHelper oAuth;
-    private Server server;
 
     // To be used once the app is ready for production well
     //private final String consKeyO = "LOzBvclzt3FQjEK9ZJexNzgINUoYe43giLzRV2Va";
@@ -129,10 +117,6 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
 
         // Assignment of the touch listener to the topmost layer
         editorView.setOnTouchListener(this);
-
-        // Calculate the point from which to zoom
-        zoomCenterX = editorView.getWidth() / 2;
-        zoomCenterY = editorView.getHeight() / 2;
 
         // Detector used for handling scale events
         mScaleDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.OnScaleGestureListener() {
@@ -252,36 +236,42 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
                 isFirstEditTapTapped = false;
                 uponTouchX = 0;
                 uponTouchY = 0;
-                currentPanX = 0;
-                currentPanY = 0;
+                editorView.setDragStatus(false);
+                editorView.setTapStatus(false);
                 break;
             case MotionEvent.ACTION_MOVE:
                 switch (currentState) {
                     case CHOOSING_EDIT_SPOT:
-                        aerialMap.scrollBy((int) (oldPanX - me.getX()), (int) (oldPanY - me.getY()));
-                        oldPanX = (int) me.getX();
-                        oldPanY = (int) me.getY();
+                        aerialMap.scrollBy((int) (oldPanX - me.getX(firstFingerI)), (int) (oldPanY - me.getY(firstFingerI)));
+                        oldPanX = (int) me.getX(firstFingerI);
+                        oldPanY = (int) me.getY(firstFingerI);
                         break;
                     case MAPPING:
-                        if (Math.abs(uponTouchX - me.getX()) < MAX_MOVEMENT_FROM_ORIGINAL_PLACEMENT
-                                && Math.abs(uponTouchY - me.getY()) < MAX_MOVEMENT_FROM_ORIGINAL_PLACEMENT
+                        if (Math.abs(uponTouchX - me.getX(firstFingerI)) < MAX_MOVEMENT_FROM_ORIGINAL_PLACEMENT
+                                && Math.abs(uponTouchY - me.getY(firstFingerI)) < MAX_MOVEMENT_FROM_ORIGINAL_PLACEMENT
                                 && (System.nanoTime() - touchStartTime) >= TIME_UNTIL_EDITING_GESTURE_IS_TRIGGERED) {
                             currentState = MapparatusState.CAN_MODIFY_MAP;
                             Log.i("Gestures", "can edit");
                         } else {
-                            int currentPanX = (int) ((oldPanX - me.getX()) / editingModeZoomFactor);
-                            int currentPanY = (int) ((oldPanY - me.getY()) / editingModeZoomFactor);
+                            int currentPanX = (int) ((oldPanX - me.getX(firstFingerI)) / editingModeZoomFactor);
+                            int currentPanY = (int) ((oldPanY - me.getY(firstFingerI)) / editingModeZoomFactor);
                             aerialMap.scrollBy(currentPanX, currentPanY);
                             editorViewPanX += currentPanX;
                             editorViewPanY += currentPanY;
                             editorView.setPanCoords(editorViewPanX, editorViewPanY);
-                            editingCursorPanX += currentPanX;
-                            editingCursorPanY += currentPanY;
-                            oldPanX = (int) me.getX();
-                            oldPanY = (int) me.getY();
+                            oldPanX = (int) me.getX(firstFingerI);
+                            oldPanY = (int) me.getY(firstFingerI);
                         }
                         break;
-
+                    case MODIFYING_MAP:
+                        if (me.getPointerCount() > 1) {
+                            editorView.setDrawingCoords(me.getX(secondFingerI), me.getY(secondFingerI));
+                            editorView.setDragStatus(true);
+                        } else {
+                            editorView.setDrawingCoords(me.getX(firstFingerI), me.getY(firstFingerI));
+                            editorView.setDragStatus(true);
+                        }
+                        break;
                 }
                 break;
 
@@ -292,14 +282,19 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
                         secondFingerI = me.getActionIndex();
                         isFirstEditTapTapped = true;
                     } else {
-                        tapX = reverseZoomCenter((int) me.getX(secondFingerI), editingModeZoomFactor, zoomCenterX) + editingCursorPanX;
-                        tapY = reverseZoomCenter((int) me.getY(secondFingerI), editingModeZoomFactor, zoomCenterY) + editingCursorPanY;
-
-                        editorView.setEditPointCoords(tapX, tapY);
+                        editorView.setDrawingCoords(me.getX(secondFingerI), me.getY(secondFingerI));
+                        editorView.setDragStatus(true);
+                        editorView.setTapStatus(true);
                     }
-                    break;
+                }
+                break;
+            case MotionEvent.ACTION_POINTER_UP:
+                if (currentState == MapparatusState.CAN_MODIFY_MAP || currentState == MapparatusState.MODIFYING_MAP) {
+                    //editorView.setDrawingCoords(me.getX(secondFingerI), me.getY(secondFingerI));
+                    editorView.setTapStatus(false);
                 }
         }
+
 
         return true;
     }
@@ -312,9 +307,10 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
 
             editorViewViewBox = e6ToE7BoundingBox(aerialMap.getBoundingBox(), editorView);
             editorView.setViewBox(editorViewViewBox);
-            editorViewPanX = 0;
-            editorViewPanY = 0;
-            editorView.setPanCoords(editorViewPanX, editorViewPanY);
+
+            // Calculate the point from which to zoom
+            zoomCenterX = editorView.getWidth() / 2;
+            zoomCenterY = editorView.getHeight() / 2;
         }
     }
 
@@ -322,95 +318,17 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         startActivity(new Intent("android.intent.action.VIEW", Uri.parse(oAuth.getRequestToken())));
     }
 
-    public void osmDownload(MenuItem item) throws IOException, InterruptedException, TimeoutException, ExecutionException {
-        class DownloadOsmXml extends AsyncTask<Void, Void, InputStream> {
-            @Override
-            protected InputStream doInBackground(Void... params) {
-                try {
-                    URL url = null;
-                    try {
-                        url = new URL("http://api.openstreetmap.org/api/0.6/map?bbox=11.54,48.14,11.543,48.145");
-                    } catch (MalformedURLException e) {
-                        e.printStackTrace();
-                    }
-                    HttpURLConnection con = null;
-                    try {
-                        con = (HttpURLConnection) url.openConnection();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    boolean isServerGzipEnabled = false;
-
-                    //--Start: header not yet send
-                    con.setReadTimeout(4000);
-                    con.setConnectTimeout(4000);
-                    con.setRequestProperty("Accept-Encoding", "gzip");
-                    con.setRequestProperty("User-Agent", "Mapparatus/Unborn");
-
-                    //--Start: got response header
-                    isServerGzipEnabled = "gzip".equals(con.getHeaderField("Content-encoding"));
-                    try {
-                        if (con.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                            System.out.println(con.getResponseCode() + "The API server does not except the request: " + con
-                                    + ", response code: " + con.getResponseCode() + " \"" + con.getResponseMessage() + "\"");
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                    if (isServerGzipEnabled) {
-                        return new GZIPInputStream(con.getInputStream());
-
-                    } else {
-                        return con.getInputStream();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    return null;
-                }
-            }
-        }
-
-        DownloadOsmXml dsf = new DownloadOsmXml();
-        dsf.execute();
-
-        InputStream nngn = dsf.get(10, TimeUnit.SECONDS);
-
-        class ReaOsmXml extends AsyncTask<InputStream, String, Void> {
-            @Override
-            protected Void doInBackground(InputStream... params) {
-                try {
-                    BufferedReader bff = new BufferedReader(new InputStreamReader(params[0]));
-                    //TextView textView = (TextView) findViewById(R.id.textView);
-                    String line;
-                    while ((line = bff.readLine()) != null) {
-                        //Log.i("BUFFER", line);
-
-                        publishProgress(line);
-                        Thread.sleep(200);
-                    }
-
-                    bff.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                return null;
-            }
-
-            @Override
-            protected void onProgressUpdate(String... values) {
-                textView.setText(values[0]);
-            }
-
-        }
-
-        new ReaOsmXml().execute(nngn);
+    public void osmDownload(MenuItem item) throws IOException, InterruptedException, TimeoutException, ExecutionException, ParserConfigurationException, SAXException {
+        OsmDataDownloader osmDataDownloader = new OsmDataDownloader(e6ToE7BoundingBox(aerialMap.getBoundingBox(), editorView), editorView);
+        osmDataDownloader.execute();
     }
 
-    private int reverseZoomCenter(int point, float factor, int canvasMidpoint) {
-        return (int) ((point - canvasMidpoint) / factor) + canvasMidpoint;
+    private float zoom(float point, float factor, int pointOfZoom) {
+        return ((point - pointOfZoom) * factor) + pointOfZoom;
+    }
+
+    private float unzoom(float point, float factor, int pointOfZoom) {
+        return ((point - pointOfZoom) / factor) + pointOfZoom;
     }
 
     private BoundingBox e6ToE7BoundingBox(BoundingBoxE6 boundingBox, View view) throws OsmException {
@@ -430,5 +348,42 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         sharedPrefsEditor.putString("urlBase", urlBase);
         sharedPrefsEditor.putString("callbackUrl", callbackUrl);
         sharedPrefsEditor.commit();
+    }
+
+    class OsmDataDownloader extends AsyncTask<Void, Void, Void> {
+        private Server server = new Server();
+        private BoundingBox boundingBox;
+        private OsmVectorEditorView editorView;
+
+        private OsmParser osmParser = new OsmParser();
+        private InputStream inputStream;
+
+        public OsmDataDownloader(BoundingBox boundingBox, OsmVectorEditorView editorView) {
+            this.boundingBox = boundingBox;
+            this.editorView = editorView;
+        }
+
+        @Override
+        protected Void doInBackground(Void... params) {
+            try {
+                inputStream = server.getStreamForBox(boundingBox);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            try {
+                osmParser.start(inputStream);
+            } catch (SAXException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (ParserConfigurationException e) {
+                e.printStackTrace();
+            }
+
+            editorView.setStorage(osmParser.getStorage());
+
+            return null;
+        }
     }
 }
