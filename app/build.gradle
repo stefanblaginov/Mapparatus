@@ -26,4 +26,5 @@ dependencies {
     compile 'org.slf4j:slf4j-android:1.7.12'
     compile 'com.android.support:appcompat-v7:22.0.0'
     compile 'org.osmdroid:osmdroid-android:4.3'
+    compile 'oauth.signpost:oauth-signpost:1.2.1.2'
 }

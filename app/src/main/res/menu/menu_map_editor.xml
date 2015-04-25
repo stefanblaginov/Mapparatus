@@ -15,4 +15,14 @@
         android:orderInCategory="100"
         app:showAsAction="never"
         android:onClick="osmDownload" />
+    <item android:id="@+id/action_upload"
+        android:title="Upload to server"
+        android:orderInCategory="100"
+        app:showAsAction="never"
+        android:onClick="uploadChangesToServer" />
+    <item android:id="@+id/action_experiment"
+        android:title="Experiment"
+        android:orderInCategory="100"
+        app:showAsAction="never"
+        android:onClick="experiment" />
 </menu>

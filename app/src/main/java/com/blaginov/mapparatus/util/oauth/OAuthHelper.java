@@ -135,6 +135,10 @@ public class OAuthHelper {
         }
     }
 
+    public OAuthConsumer getOAuthConsumer() {
+        return this.sConsumer;
+    }
+
     private String[] getVerifier(Uri uri) {
         // extract the token if it exists
         if (uri == null) {

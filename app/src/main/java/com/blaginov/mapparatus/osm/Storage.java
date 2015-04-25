@@ -147,7 +147,7 @@ public class Storage implements Serializable {
         return waynodes;
 	}
 
-	void insertNodeUnsafe(final Node node) throws StorageException {
+	public void insertNodeUnsafe(final Node node) throws StorageException {
 		try {
 			nodes.add(node);
 		} catch (Error err) { // should really only be OutOfMemory
@@ -172,7 +172,7 @@ public class Storage implements Serializable {
 		}
 	}
 	
-	void insertElementSafe(final OsmElement elem) throws StorageException {
+	public void insertElementSafe(final OsmElement elem) throws StorageException {
 		if (!contains(elem)) {
 			insertElementUnsafe(elem);
 		}

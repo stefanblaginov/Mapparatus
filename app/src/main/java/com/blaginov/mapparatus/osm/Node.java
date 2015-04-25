@@ -40,7 +40,7 @@ public class Node extends OsmElement implements GeoPoint {
 	 * @param lat WGS84 decimal Latitude-Coordinate times 1E7.
 	 * @param lon WGS84 decimal Longitude-Coordinate times 1E7.
 	 */
-	Node(final long osmId, final long osmVersion, final byte status, final int lat, final int lon) {
+	public Node(final long osmId, final long osmVersion, final byte status, final int lat, final int lon) {
 		super(osmId, osmVersion, status);
 		this.lat = lat;
 		this.lon = lon;

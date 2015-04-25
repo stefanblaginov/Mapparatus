@@ -39,6 +39,8 @@ import java.util.concurrent.TimeoutException;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import oauth.signpost.OAuthConsumer;
+
 public class MapEditor extends ActionBarActivity implements View.OnTouchListener {
     private enum MapparatusState { CHOOSING_EDIT_SPOT, MAPPING, CAN_MODIFY_MAP, MODIFYING_MAP }
 
@@ -83,6 +85,7 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
     // OAuth-related variables
     private SharedPreferences sharedPrefs;
     private OAuthHelper oAuth;
+    private OAuthConsumer oAuthConsumer;
 
     // To be used once the app is ready for production well
     //private final String consKeyO = "LOzBvclzt3FQjEK9ZJexNzgINUoYe43giLzRV2Va";
@@ -93,6 +96,7 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
     private final String urlBaseD = "http://api06.dev.openstreetmap.org/";
     private final String callback = "mapparatus://oauth/";
     private TextView textView;
+    private Server server;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -178,8 +182,10 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
             sharedPrefsEditor.commit();
             // Resume OAuth processing
             oAuth.completeOAuthProcess(this.getIntent().getData());
+            oAuthConsumer = oAuth.getOAuthConsumer();
             Toast toast = Toast.makeText(this, sharedPrefs.getString("accessToken0", ""), Toast.LENGTH_SHORT);
             Toast toast2 = Toast.makeText(this, sharedPrefs.getString("accessToken1", ""), Toast.LENGTH_SHORT);
+
             toast.show();
             toast2.show();
         }
@@ -323,6 +329,18 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         osmDataDownloader.execute();
     }
 
+    public void uploadChangesToServer(MenuItem item) {
+        try {
+            editorView.uploadChangesToServer();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void experiment(MenuItem item) {
+        editorView.experiment();
+    }
+
     private float zoom(float point, float factor, int pointOfZoom) {
         return ((point - pointOfZoom) * factor) + pointOfZoom;
     }
@@ -351,7 +369,7 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
     }
 
     class OsmDataDownloader extends AsyncTask<Void, Void, Void> {
-        private Server server = new Server();
+        private Server server = new Server(oAuthConsumer, sharedPrefs.getString("accessToken0", ""), sharedPrefs.getString("accessToken1", ""));
         private BoundingBox boundingBox;
         private OsmVectorEditorView editorView;
 
@@ -361,6 +379,12 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         public OsmDataDownloader(BoundingBox boundingBox, OsmVectorEditorView editorView) {
             this.boundingBox = boundingBox;
             this.editorView = editorView;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+
         }
 
         @Override
@@ -382,6 +406,7 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
             }
 
             editorView.setStorage(osmParser.getStorage());
+            editorView.setServer(server);
 
             return null;
         }
