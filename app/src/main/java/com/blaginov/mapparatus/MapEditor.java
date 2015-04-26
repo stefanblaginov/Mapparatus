@@ -26,6 +26,7 @@ import com.blaginov.mapparatus.views.OsmVectorEditorView;
 
 import org.osmdroid.tileprovider.tilesource.bing.BingMapTileSource;
 import org.osmdroid.util.BoundingBoxE6;
+import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapController;
 import org.osmdroid.views.MapView;
 import org.xml.sax.SAXException;
@@ -115,6 +116,10 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         aerialMap.setMaxZoomLevel(19);
         aerialMapController = new MapController(aerialMap);
         aerialMapController.setZoom(INITIAL_CHOOSING_MODE_ZOOM_FACTOR);
+
+        // TODO: Remove before submitting
+        aerialMapController.setZoom(19);
+        aerialMapController.setCenter(new GeoPoint(53.381033, -1.480349));
 
         // Initalisation of the OSM vector editor layer
         editorView = (OsmVectorEditorView) findViewById(R.id.osmVectorEditorView);

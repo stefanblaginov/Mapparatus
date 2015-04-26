@@ -12,34 +12,28 @@ import android.util.Log;
 import android.view.View;
 
 import com.blaginov.mapparatus.R;
-import com.blaginov.mapparatus.exception.StorageException;
 import com.blaginov.mapparatus.osm.BoundingBox;
 import com.blaginov.mapparatus.osm.Node;
-import com.blaginov.mapparatus.osm.OsmParser;
 import com.blaginov.mapparatus.osm.Server;
 import com.blaginov.mapparatus.osm.Storage;
 import com.blaginov.mapparatus.osm.StorageDelegator;
 import com.blaginov.mapparatus.osm.Way;
 import com.blaginov.mapparatus.util.GeoMath;
 
-import org.osmdroid.views.MapView;
-import org.xml.sax.SAXException;
-
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.MalformedURLException;
 import java.util.List;
-
-import javax.xml.parsers.ParserConfigurationException;
 
 /**
  * Created by stefanblag on 20.04.15.
  */
 public class OsmVectorEditorView extends View {
 
+    private enum EditingState { CAN_DRAW, ADDING_NODE, MOVING_NODE, CAN_REMOVE }
+
     private BoundingBox viewBox;
     private StorageDelegator storageDelegator;
-    Server server;
+    private Server server;
+    private EditingState currentState = EditingState.CAN_DRAW;
 
     private int panX;
     private int panY;
@@ -50,12 +44,14 @@ public class OsmVectorEditorView extends View {
 
     private boolean dragging = false;
     private boolean tapping = false;
-    private boolean movingNode = false;
+    private boolean nodePlacingLimit = false;
+    private boolean nodeRemovalLimit = false;
     private float drawX;
     private float drawY;
     private final double SELECTING_TOUCH_RADIUS_SQRD = Math.pow(15, 2);
+    private boolean cursorOnNode = false;
 
-    private long currentMovingNodeId;
+    private long nodeCursorIsCurrentlyOnId;
     private long lastAssignedId = -1;
 
     private boolean addElement = false;
@@ -113,72 +109,75 @@ public class OsmVectorEditorView extends View {
                     }
                 }
 
-                if (!tapping) {
-                    movingNode = false;
-                    currentMovingNodeId = -1;
+                if (currentState != EditingState.CAN_REMOVE) {
+                    // Used to limit one tap to one added node
+                    if (!tapping) {
+                        nodePlacingLimit = false;
+                        currentState = EditingState.CAN_DRAW;
+                    }
+
+                    if (currentState == EditingState.MOVING_NODE && !tapping) {
+                        currentState = EditingState.CAN_DRAW;
+                    }
+                } else {
+                    if (!tapping) {
+                        nodeRemovalLimit = false;
+                    }
                 }
 
                 for (Node node : storageDelegator.getCurrentStorage().getNodes()) {
-                    if (node.getOsmId()<0) {
-                        canvas.drawCircle(zoom((GeoMath.lonE7ToX(getWidth(), viewBox, node.getLon()) - panX), zoomFactor, zoomCenterX),
-                                zoom((GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, node.getLat()) - panY), zoomFactor, zoomCenterY), 10, nodePaint);
-                    }
                     float currentNodeX = zoom((GeoMath.lonE7ToX(getWidth(), viewBox, node.getLon()) - panX), zoomFactor, zoomCenterX);
                     float currentNodeY = zoom((GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, node.getLat()) - panY), zoomFactor, zoomCenterY);
 
-                    canvas.drawCircle(currentNodeX, currentNodeY, 10, nodePaint);
-
-                    if (tapping) {
-                        if (movingNode) {
-
-                        } else if (Math.pow(drawX - currentNodeX, 2) + Math.pow(drawY + DRAW_OFFSET_Y - currentNodeY, 2) < SELECTING_TOUCH_RADIUS_SQRD) {
-                            movingNode = true;
-                            currentMovingNodeId = node.getOsmId();
-                            node.updateState(Node.STATE_MODIFIED);
-                            canvas.drawCircle(drawX, drawY + DRAW_OFFSET_Y, 30, highlightedNodePaint);
-                        } else {
-                            addElement = true;
-                        }
-                    } else if (dragging && Math.pow(drawX - currentNodeX, 2) + Math.pow(drawY + DRAW_OFFSET_Y - currentNodeY, 2) < SELECTING_TOUCH_RADIUS_SQRD) {
+                    if (dragging && Math.pow(drawX - currentNodeX, 2) + Math.pow(drawY + DRAW_OFFSET_Y - currentNodeY, 2) < SELECTING_TOUCH_RADIUS_SQRD) {
+                        cursorOnNode = true;
+                        nodeCursorIsCurrentlyOnId = node.getOsmId();
                         canvas.drawCircle(currentNodeX, currentNodeY, 30, nodePaint);
+                    } else {
+                        canvas.drawCircle(currentNodeX, currentNodeY, 10, nodePaint);
                     }
                 }
 
-                if (movingNode) {
-                    storageDelegator.getUndo().createCheckpoint("Charlie");
-                    storageDelegator.updateLatLon(storageDelegator.getCurrentStorage().getNode(currentMovingNodeId),
-                            GeoMath.yToLatE7(getHeight(), getWidth(), viewBox, unzoom(drawY + DRAW_OFFSET_Y, zoomFactor, zoomCenterY) + panY),
-                            GeoMath.yToLatE7(getHeight(), getWidth(), viewBox, unzoom(drawY + DRAW_OFFSET_Y, zoomFactor, zoomCenterY) + panY));
-                    //storageDelegator.getCurrentStorage().getNode(currentMovingNodeId).setLon(GeoMath.xToLonE7(getWidth(), viewBox, unzoom(drawX, zoomFactor, zoomCenterX) + panX));
-                    //storageDelegator.getCurrentStorage().getNode(currentMovingNodeId).setLat(GeoMath.yToLatE7(getHeight(), getWidth(), viewBox, unzoom(drawY + DRAW_OFFSET_Y, zoomFactor, zoomCenterY) + panY));
-                    canvas.drawCircle(drawX, drawY + DRAW_OFFSET_Y, 30, highlightedNodePaint);
-                }
-
-                if (addElement) {
-                    storageDelegator.getUndo().createCheckpoint("Charlie");
-                    storageDelegator.insertElementSafe(new Node(lastAssignedId, 1, Node.STATE_CREATED,
-                            GeoMath.yToLatE7(getHeight(), getWidth(), viewBox, unzoom(drawY + DRAW_OFFSET_Y, zoomFactor, zoomCenterY) + panY),
-                            GeoMath.xToLonE7(getWidth(), viewBox, unzoom(drawX, zoomFactor, zoomCenterX) + panX)));
-                    //storageDelegator.getCurrentStorage().insertNodeUnsafe(new Node(lastAssignedId, 1, Node.STATE_CREATED,
-                          //  GeoMath.yToLatE7(getHeight(), getWidth(), viewBox, unzoom(drawY + DRAW_OFFSET_Y, zoomFactor, zoomCenterY) + panY),
-                          //  GeoMath.xToLonE7(getWidth(), viewBox, unzoom(drawX, zoomFactor, zoomCenterX) + panX)));
-                    lastAssignedId--;
-                    canvas.drawCircle(drawX, drawY + DRAW_OFFSET_Y, 30, createdNodePaint);
-                }
-
-                addElement = false;
-
-            }
-
-            if (storageDelegator != null && !storageDelegator.getApiStorage().isEmpty() && experiment) {
-                for (Node node : storageDelegator.getApiStorage().getNodes()) {
-                    float currentNodeX = zoom((GeoMath.lonE7ToX(getWidth(), viewBox, node.getLon()) - panX), zoomFactor, zoomCenterX);
-                    float currentNodeY = zoom((GeoMath.latE7ToY(getHeight(), getWidth(), viewBox, node.getLat()) - panY), zoomFactor, zoomCenterY);
-                    canvas.drawCircle(currentNodeX, currentNodeY, 30, new Paint());
+                switch (currentState) {
+                    case MOVING_NODE:
+                        storageDelegator.getUndo().createCheckpoint("Moved node");
+                        storageDelegator.updateLatLon(storageDelegator.getCurrentStorage().getNode(nodeCursorIsCurrentlyOnId),
+                                GeoMath.yToLatE7(getHeight(), getWidth(), viewBox, unzoom(drawY + DRAW_OFFSET_Y, zoomFactor, zoomCenterY) + panY),
+                                GeoMath.xToLonE7(getWidth(), viewBox, unzoom(drawX, zoomFactor, zoomCenterX) + panX));
+                        canvas.drawCircle(drawX, drawY + DRAW_OFFSET_Y, 30, highlightedNodePaint);
+                        break;
+                    case CAN_REMOVE:
+                        if (tapping && !nodeRemovalLimit && cursorOnNode) {
+                            nodeRemovalLimit = true;
+                            storageDelegator.removeNode(storageDelegator.getCurrentStorage().getNode(nodeCursorIsCurrentlyOnId));
+                        }
+                        break;
+                    case CAN_DRAW:
+                        if (tapping && !nodePlacingLimit && !cursorOnNode) {
+                            currentState = EditingState.CAN_DRAW;
+                            nodePlacingLimit = true;
+                            storageDelegator.getUndo().createCheckpoint("Placed node");
+                            storageDelegator.insertElementSafe(new Node(lastAssignedId, 1, Node.STATE_CREATED,
+                                    GeoMath.yToLatE7(getHeight(), getWidth(), viewBox, unzoom(drawY + DRAW_OFFSET_Y, zoomFactor, zoomCenterY) + panY),
+                                    GeoMath.xToLonE7(getWidth(), viewBox, unzoom(drawX, zoomFactor, zoomCenterX) + panX)));
+                            lastAssignedId--;
+                            canvas.drawCircle(drawX, drawY + DRAW_OFFSET_Y, 30, createdNodePaint);
+                        } else if (tapping && cursorOnNode) {
+                            currentState = EditingState.MOVING_NODE;
+                        }
+                        break;
                 }
             }
 
-            if (dragging || tapping) {
+            /*
+            if (experiment && storageDelegator.getUndo().canUndo()) {
+                storageDelegator.getUndo().undo();
+                experiment = false;
+            }*/
+
+            cursorOnNode = false;
+
+            if (dragging) {
                 canvas.drawBitmap(magnicursor, drawX + magnicursorOffsetX, drawY + MAGNICURSOR_OFFSET_Y, nodePaint);
             }
         }
@@ -237,7 +236,8 @@ public class OsmVectorEditorView extends View {
     }
 
     public void experiment() {
-        this.experiment = this.experiment ? false : true;
+        //this.experiment = this.experiment ? false : true;
+        currentState = currentState != EditingState.CAN_REMOVE ? EditingState.CAN_REMOVE : EditingState.CAN_DRAW;
     }
 
     class OsmDataUploader extends AsyncTask<Void, Void, Void> {
