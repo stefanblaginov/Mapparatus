@@ -61,7 +61,9 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
     // Variable used to determine gesture
     private final int MAX_MOVEMENT_FROM_ORIGINAL_PLACEMENT = 30;
     private final long TIME_UNTIL_EDITING_GESTURE_IS_TRIGGERED = 500000000;
+    private final long LONG_TAP_TIME = 500000000;
     private long touchStartTime;
+    private long tapStartTime;
 
     // Pan-related variables
     private float uponTouchX;
@@ -262,7 +264,6 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
                                 && Math.abs(uponTouchY - me.getY(firstFingerI)) < MAX_MOVEMENT_FROM_ORIGINAL_PLACEMENT
                                 && (System.nanoTime() - touchStartTime) >= TIME_UNTIL_EDITING_GESTURE_IS_TRIGGERED) {
                             currentState = MapparatusState.CAN_MODIFY_MAP;
-                            Log.i("Gestures", "can edit");
                         } else {
                             int currentPanX = (int) ((oldPanX - me.getX(firstFingerI)) / editingModeZoomFactor);
                             int currentPanY = (int) ((oldPanY - me.getY(firstFingerI)) / editingModeZoomFactor);
@@ -296,12 +297,20 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
                         editorView.setDrawingCoords(me.getX(secondFingerI), me.getY(secondFingerI));
                         editorView.setDragStatus(true);
                         editorView.setTapStatus(true);
+                        tapStartTime = System.nanoTime();
                     }
                 }
                 break;
             case MotionEvent.ACTION_POINTER_UP:
                 if (currentState == MapparatusState.CAN_MODIFY_MAP || currentState == MapparatusState.MODIFYING_MAP) {
                     //editorView.setDrawingCoords(me.getX(secondFingerI), me.getY(secondFingerI));
+                    if (System.nanoTime() - tapStartTime >= LONG_TAP_TIME) {
+                        editorView.setLongTapUp();
+                        Log.i("Gestures", "Tap was long");
+                    } else {
+                        editorView.setTapUp();
+                        Log.i("Gestures", "Tap was short");
+                    }
                     editorView.setTapStatus(false);
                 }
         }
