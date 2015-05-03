@@ -23,6 +23,7 @@ import com.blaginov.mapparatus.osm.OsmParser;
 import com.blaginov.mapparatus.osm.Server;
 import com.blaginov.mapparatus.util.oauth.OAuthHelper;
 import com.blaginov.mapparatus.views.OsmVectorEditorView;
+import com.samsung.android.sdk.pen.Spen;
 
 import org.osmdroid.tileprovider.tilesource.bing.BingMapTileSource;
 import org.osmdroid.util.BoundingBoxE6;
@@ -105,6 +106,8 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map_editor);
+
+        Spen spenPackage = new Spen();
 
         sharedPrefs = getSharedPreferences("mapparatus", 0);
 

@@ -27,4 +27,7 @@ dependencies {
     compile 'com.android.support:appcompat-v7:22.0.0'
     compile 'org.osmdroid:osmdroid-android:4.3'
     compile 'oauth.signpost:oauth-signpost:1.2.1.2'
+    compile files('/home/stefanblag/Документи/Проекти/Mapparatus/Mapparatus/libs/pen-v3.1.4.jar')
+    compile files('/home/stefanblag/Документи/Проекти/Mapparatus/Mapparatus/libs/postmemopopup.jar')
+    compile files('/home/stefanblag/Документи/Проекти/Mapparatus/Mapparatus/libs/sdk-v1.0.0.jar')
 }
