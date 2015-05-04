@@ -1,6 +1,7 @@
 package com.blaginov.mapparatus;
 
 import android.annotation.TargetApi;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -23,6 +24,8 @@ import com.blaginov.mapparatus.osm.OsmParser;
 import com.blaginov.mapparatus.osm.Server;
 import com.blaginov.mapparatus.util.oauth.OAuthHelper;
 import com.blaginov.mapparatus.views.OsmVectorEditorView;
+import com.cocosw.bottomsheet.BottomSheet;
+import com.melnykov.fab.FloatingActionButton;
 import com.samsung.android.sdk.pen.Spen;
 
 import org.osmdroid.tileprovider.tilesource.bing.BingMapTileSource;
@@ -52,6 +55,9 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
     private MapController aerialMapController;
     private OsmVectorEditorView editorView;
     private BoundingBox editorViewViewBox;
+
+    private FloatingActionButton fab;
+    private MenuItem downoladButton, uploadButton, deleteButton, undoButton;
 
     private ScaleGestureDetector mScaleDetector;
 
@@ -109,6 +115,8 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
 
         Spen spenPackage = new Spen();
 
+
+
         sharedPrefs = getSharedPreferences("mapparatus", 0);
 
         // Initalisation of the aerial map underlay
@@ -123,11 +131,22 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         aerialMapController.setZoom(INITIAL_CHOOSING_MODE_ZOOM_FACTOR);
 
         // TODO: Remove before submitting
-        aerialMapController.setZoom(19);
-        aerialMapController.setCenter(new GeoPoint(53.381033, -1.480349));
+        //aerialMapController.setZoom(19);
+        //aerialMapController.setCenter(new GeoPoint(53.381033, -1.480349));
 
         // Initalisation of the OSM vector editor layer
         editorView = (OsmVectorEditorView) findViewById(R.id.osmVectorEditorView);
+        editorView.setContext(this);
+
+        fab = (FloatingActionButton) findViewById(R.id.fab);
+        fab.hide(false);
+        fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                editorView.openKvpMenu();
+                fab.hide(true);
+            }
+        });
 
         // Assignment of the touch listener to the topmost layer
         editorView.setOnTouchListener(this);
@@ -204,7 +223,12 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
+        invalidateOptionsMenu();
         getMenuInflater().inflate(R.menu.menu_map_editor, menu);
+        downoladButton = menu.findItem(R.id.action_downolad_region);
+        uploadButton = menu.findItem(R.id.action_upload_changes);
+        deleteButton = menu.findItem(R.id.action_delete);
+        undoButton = menu.findItem(R.id.action_undo);
         return true;
     }
 
@@ -214,14 +238,14 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
-
+        /*
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_login) {
             return true;
         }
         if (id == R.id.action_download) {
             return true;
-        }
+        }*/
 
         return super.onOptionsItemSelected(item);
     }
@@ -240,6 +264,47 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
             mScaleDetector.onTouchEvent(me);
         }
 
+        if (currentState == MapparatusState.CHOOSING_EDIT_SPOT && aerialMap.getZoomLevel() > 18) {
+            if (!downoladButton.isVisible()) {
+                downoladButton.setVisible(true);
+            }
+            if (uploadButton.isVisible()) {
+                uploadButton.setVisible(false);
+            }
+            if (deleteButton.isVisible()) {
+                deleteButton.setVisible(false);
+            }
+            if (undoButton.isVisible()) {
+                undoButton.setVisible(false);
+            }
+        } else if (currentState == MapparatusState.CHOOSING_EDIT_SPOT) {
+            if (downoladButton.isVisible()) {
+                downoladButton.setVisible(false);
+            }
+            if (uploadButton.isVisible()) {
+                uploadButton.setVisible(false);
+            }
+            if (deleteButton.isVisible()) {
+                deleteButton.setVisible(false);
+            }
+            if (undoButton.isVisible()) {
+                undoButton.setVisible(false);
+            }
+        } else {
+            if (downoladButton.isVisible()) {
+                downoladButton.setVisible(false);
+            }
+            if (!uploadButton.isVisible()) {
+                uploadButton.setVisible(true);
+            }
+            if (!deleteButton.isVisible()) {
+                deleteButton.setVisible(true);
+            }
+            if (!undoButton.isVisible()) {
+                undoButton.setVisible(true);
+            }
+        }
+
         switch(me.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 firstFingerI = me.getActionIndex();
@@ -254,6 +319,7 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
                 uponTouchY = 0;
                 editorView.setDragStatus(false);
                 editorView.setTapStatus(false);
+                fab.hide(true);
                 break;
             case MotionEvent.ACTION_MOVE:
                 switch (currentState) {
@@ -282,6 +348,7 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
                         if (me.getPointerCount() > 1) {
                             editorView.setDrawingCoords(me.getX(secondFingerI), me.getY(secondFingerI));
                             editorView.setDragStatus(true);
+                            fab.show(true);
                         } else {
                             editorView.setDrawingCoords(me.getX(firstFingerI), me.getY(firstFingerI));
                             editorView.setDragStatus(true);
@@ -322,9 +389,22 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         return true;
     }
 
-    public void startEditing(MenuItem item) throws OsmException {
+    public void downloadRegion(MenuItem item) throws OsmException {
         if (currentState == MapparatusState.CHOOSING_EDIT_SPOT) {
             currentState = MapparatusState.MAPPING;
+
+            if (downoladButton.isVisible()) {
+                downoladButton.setVisible(false);
+            }
+            if (!uploadButton.isVisible()) {
+                uploadButton.setVisible(true);
+            }
+            if (!deleteButton.isVisible()) {
+                deleteButton.setVisible(true);
+            }
+            if (!undoButton.isVisible()) {
+                undoButton.setVisible(true);
+            }
 
             aerialMap.setMinZoomLevel(choosingModeZoomFactor);
 
@@ -334,6 +414,9 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
             // Calculate the point from which to zoom
             zoomCenterX = editorView.getWidth() / 2;
             zoomCenterY = editorView.getHeight() / 2;
+
+            OsmDataDownloader osmDataDownloader = new OsmDataDownloader(e6ToE7BoundingBox(aerialMap.getBoundingBox(), editorView), editorView);
+            osmDataDownloader.execute();
         }
     }
 
@@ -341,9 +424,12 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         startActivity(new Intent("android.intent.action.VIEW", Uri.parse(oAuth.getRequestToken())));
     }
 
-    public void osmDownload(MenuItem item) throws IOException, InterruptedException, TimeoutException, ExecutionException, ParserConfigurationException, SAXException {
-        OsmDataDownloader osmDataDownloader = new OsmDataDownloader(e6ToE7BoundingBox(aerialMap.getBoundingBox(), editorView), editorView);
-        osmDataDownloader.execute();
+    public void toggleDeleteMode(MenuItem item) {
+        editorView.toggleDeleteMode();
+    }
+
+    public void triggerUndo(MenuItem item) {
+        editorView.triggerUndo();
     }
 
     public void uploadChangesToServer(MenuItem item) {
@@ -354,9 +440,7 @@ public class MapEditor extends ActionBarActivity implements View.OnTouchListener
         }
     }
 
-    public void experiment(MenuItem item) {
-        editorView.experiment();
-    }
+
 
     private float zoom(float point, float factor, int pointOfZoom) {
         return ((point - pointOfZoom) * factor) + pointOfZoom;

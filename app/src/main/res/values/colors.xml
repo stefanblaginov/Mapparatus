@@ -2,5 +2,8 @@
 <resources>
     <color name="primary">#2196F3</color>
     <color name="primary_dark">#0D47A1</color>
-    <color name="accent">#F44336</color>
+    <color name="edit_button">#F44336</color>
+    <color name="edit_button_pressed">#EF5350</color>
+    <color name="edit_button_ripple">#C62828</color>
+    <color name="action_bar_elements">#FFFFFF</color>
 </resources>

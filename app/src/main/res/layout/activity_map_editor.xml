@@ -1,4 +1,5 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:fab="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent">
@@ -13,5 +14,16 @@
             android:id="@+id/osmVectorEditorView"
             android:layout_width="fill_parent"
             android:layout_height="fill_parent" />
+        <com.melnykov.fab.FloatingActionButton
+            android:id="@+id/fab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|left"
+            android:layout_margin="16dp"
+            android:src="@drawable/ic_action_edit"
+            fab:fab_colorNormal="@color/edit_button"
+            fab:fab_colorPressed="@color/edit_button_pressed"
+            fab:fab_colorRipple="@color/edit_button_ripple"
+            fab:fab_shadow="true" />
     </FrameLayout>
 </LinearLayout>
